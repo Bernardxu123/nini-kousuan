@@ -1,0 +1,12 @@
+name = "nini-kousuan"
+compatibility_date = "2024-11-01"
+pages_build_output_dir = "."
+
+# Cloudflare KV 命名空间绑定说明：
+# 1. 登录 Cloudflare Dashboard -> Workers & Pages -> KV -> Create Namespace -> 命名为 KOUSUAN_KV
+# 2. 在 Pages 项目设置中添加绑定：Variable name 填 KOUSUAN_KV，选中刚刚创建的 KV Namespace
+# 3. 本地使用 wrangler 预览时可运行：npx wrangler pages dev .
+
+[[kv_namespaces]]
+binding = "KOUSUAN_KV"
+id = "a7be5a6e12fc4ccb9239209fdd758827"

@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>天天口算 · 知识图谱出题（专为妮妮定制）</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+
+  <aside class="side">
+    <div class="brand">
+      <div>天天口算 · 知识图谱</div>
+      <small>专为一年级设计 · 每天一张 A4 · 打印前无需联网</small>
+    </div>
+
+    <!-- 妮妮专属档案卡片 (满足需求 5) -->
+    <div class="nini-card" id="niniCard">
+      <div class="nini-head">
+        <div class="nini-avatar">👧</div>
+        <div class="nini-info">
+          <div class="nini-name">妮妮 <span style="font-size:11.5px;font-weight:normal;color:#475569">（6岁 · 华五小学）</span></div>
+          <div class="nini-school">上海嘉定华五小学（徐行镇）· 一年级</div>
+        </div>
+      </div>
+      <div class="nini-stats">
+        <div class="stat-pill"><b id="statStreak">0 天</b><span>连续打卡</span></div>
+        <div class="stat-pill"><b id="statStars">0 颗</b><span>收集星星</span></div>
+        <div class="stat-pill"><b id="statErrors">0 道</b><span>待攻克错题</span></div>
+      </div>
+    </div>
+
+    <fieldset>
+      <legend>🎯 练到哪一步</legend>
+      <div id="presets"></div>
+      
+      <!-- 年级与学期筛选切换 (满足需求 2：先一年级上，再一年级下) -->
+      <label class="f">课本学期分类（严格对应课本教学进度）</label>
+      <div class="grade-tabs" id="gradeTabs">
+        <button class="grade-tab" data-g="all">全部</button>
+        <button class="grade-tab on" data-g="1-up">一年级上册</button>
+        <button class="grade-tab" data-g="1-down">一年级下册</button>
+        <button class="grade-tab" data-g="2">二年级</button>
+      </div>
+      
+      <label class="f">知识点选择（勾选＝今天的目标）</label>
+      <div id="topicList"></div>
+      <label class="check"><input type="checkbox" id="autoPrereq" checked>自动带回先修复习</label>
+      <div class="row">
+        <div><label class="f">复习占比 <span id="reviewPct">25%</span></label>
+          <input type="range" id="reviewRatio" min="0" max="60" step="5" value="25"></div>
+      </div>
+    </fieldset>
+
+    <!-- 题量与运算项数控制 (满足需求 6：连加连减选项控制) -->
+    <fieldset>
+      <legend>🔢 题量与项数控制</legend>
+      <label class="check"><input type="checkbox" id="fluOnly">只出口算（纯口算日，不出变式和读题）</label>
+      <label class="check"><input type="checkbox" id="skipWord">不出「读题解决问题」（份量还给口算/变式）</label>
+      <div class="row">
+        <div><label class="f">每天题数</label><input type="number" id="count" min="10" max="80" value="48"></div>
+        <div><label class="f">难度档</label>
+          <select id="level">
+            <option value="0">0 启蒙（纯直算）</option>
+            <option value="1">1 常规</option>
+            <option value="2" selected>2 有思维</option>
+            <option value="3">3 挑战</option>
+          </select></div>
+      </div>
+
+      <!-- 运算项数与连加连减精细设置 -->
+      <div class="term-box">
+        <label class="f" style="margin-top:0">运算项数与连加连减控制</label>
+        <div class="term-grid">
+          <label class="check"><input type="checkbox" id="allow2" checked>2个数运算 (a±b)</label>
+          <label class="check"><input type="checkbox" id="allow3" checked>3个数连算 (a±b±c)</label>
+          <label class="check"><input type="checkbox" id="allow4">4个数挑战 (4项连算)</label>
+        </div>
+        <div class="chain-forms">
+          <span>连算类型：</span>
+          <label class="check"><input type="checkbox" id="chainAdd" checked>连加</label>
+          <label class="check"><input type="checkbox" id="chainSub" checked>连减</label>
+          <label class="check"><input type="checkbox" id="chainMix" checked>加减混合</label>
+        </div>
+      </div>
+
+      <label class="f">三区配比（口算 / 变式 / 读题）＝ <span id="mixPct">26 / 12 / 10</span></label>
+      <input type="range" id="flu" min="0" max="90" value="55">
+      <input type="range" id="th" min="0" max="60" value="25">
+      <input type="range" id="wd" min="0" max="60" value="20">
+      <p class="hint">难度 2 以上才会出 ★ 题（缺项填空、等式平衡、多余条件）。</p>
+    </fieldset>
+
+    <!-- 精准回炉与去重设置 (满足需求 5) -->
+    <fieldset>
+      <legend>🔄 智能出题与防重复</legend>
+      <label class="check"><input type="checkbox" id="adaptiveErrors" checked>针对妮妮弱项与错题精准回炉出题</label>
+      <div class="row">
+        <div><label class="f">同题面冷却（天）</label><input type="number" id="cdSig" min="0" max="60" value="6"></div>
+        <div><label class="f">同数族冷却（天）</label><input type="number" id="cdFact" min="0" max="30" value="1"></div>
+      </div>
+      <label class="check"><input type="checkbox" id="strictDedup">永久不重复</label>
+      <p class="hint">10 以内加法事实仅 30 余组，同一题面 6 天不重现；同数族隔天换面孔（3＋5 → ( )＋5＝8 → 8－5），符合艾宾浩斯记忆遗忘规律。</p>
+      <button id="btnClear" type="button" style="margin-top:6px;width:100%">清空本地台账与记录</button>
+    </fieldset>
+
+    <!-- 科学读题辅导支持 (满足需求：阅读薄弱专项提高) -->
+    <fieldset>
+      <legend>📖 读题与拼音助读（降低解码认知负荷）</legend>
+      <label class="f">伴读阶梯（四步阶梯，按掌握度逐步放手）</label>
+      <select id="readStep">
+        <option value="1">1 家长读题，孩子手指字听</option>
+        <option value="2" selected>2 孩子出声读，家长陪伴</option>
+        <option value="3">3 孩子默读＋自己画方块图</option>
+        <option value="4">4 孩子完全独立完成</option>
+      </select>
+      <div class="row">
+        <div><label class="f">拼音注音模式</label>
+          <select id="annotate">
+            <option value="full" selected>逐字拼音（推荐6岁初学）</option>
+            <option value="keyword">只高亮题眼词</option>
+            <option value="off">不注音（纯汉字）</option>
+          </select></div>
+      </div>
+      <label class="check"><input type="checkbox" id="showWordCard" checked>卷头印今日词卡（消除词意阻碍）</label>
+      <label class="check"><input type="checkbox" id="showZiCard" checked>印读题识字卡（第 3 页，高频题词＋三日打卡）</label>
+      <label class="check"><input type="checkbox" id="showBar" checked>应用题配方块图与十格阵 (CPA 具象表征)</label>
+      <label class="check"><input type="checkbox" id="showExample" checked>新题型先给一道例题支架</label>
+      <p class="hint">词卡只解释语义情境，<b>坚决不教「见一共就加」</b>（违背应用题建构本质）。</p>
+    </fieldset>
+
+    <!-- 版式硬约束 (GB 40070-2021) 与书写留空 (满足需求 3) -->
+    <fieldset>
+      <legend>🖨️ A4 版式与字号调节</legend>
+      <div class="row">
+        <div>
+          <label class="f">字号 pt（单页48题推荐 14~15pt）</label>
+          <div class="font-input-box">
+            <input type="number" id="fontPt" min="11" max="22" step="0.5" value="14.5" style="width:70px">
+            <div class="font-pill-row" id="fontPresetBtns">
+              <button type="button" class="btn-preset" data-pt="13.5">13.5</button>
+              <button type="button" class="btn-preset active" data-pt="14.5">14.5</button>
+              <button type="button" class="btn-preset" data-pt="15">15</button>
+              <button type="button" class="btn-preset" data-pt="16">16</button>
+            </div>
+          </div>
+        </div>
+        <div><label class="f">口算列数</label>
+          <select id="cols"><option>3</option><option selected>4</option><option>5</option></select></div>
+      </div>
+      <label class="f">行距</label>
+      <select id="gap">
+        <option value="tight">紧凑（5mm 底线）</option>
+        <option value="normal" selected>标准（15mm 题距）</option>
+        <option value="loose">宽松（18mm 题距）</option>
+      </select>
+      <label class="check"><input type="checkbox" id="showAnswer">在卷面上显示答案（打印前可取消）</label>
+      <p class="hint">可自由调整字号（13.5~16pt），<b>使用规范等号与宽敞下划线留白，彻底取消方块</b>，一页完美容纳 48 题。</p>
+    </fieldset>
+
+    <div style="margin: 10px 0 6px">
+      <button class="primary" id="btnOnePage48" type="button" style="width:100%;font-size:14px;padding:9px">📄 一键 48 题满页卷 (单页A4)</button>
+    </div>
+    <div class="bar">
+      <button id="btnNew" type="button">🎲 换一套</button>
+      <button id="btnPrint" type="button">🖨️ 打印 A4</button>
+    </div>
+    <div class="bar">
+      <button class="warm" id="btnErrorPaper" type="button">🎯 妮妮错题提分卷</button>
+      <button id="btnOnlineGrade" type="button">📝 在线批改试卷</button>
+    </div>
+    <div id="pageInfo" class="hint" style="margin-top:8px"></div>
+    <div id="statLine"></div>
+  </aside>
+
+  <main class="main">
+    <div class="tabs">
+      <button data-tab="paper" class="on">📄 今天的卷子</button>
+      <button data-tab="reading">📖 妮妮读题乐园</button>
+      <button data-tab="errors">📕 妮妮错题本 <span id="errorBadge" class="badge warn" style="display:none">0</span></button>
+      <button data-tab="progress">🌟 妮妮成长足迹</button>
+      <button data-tab="graph">🧭 知识图谱</button>
+      <button data-tab="cloud">☁️ 云端同步与部署</button>
+      <button data-tab="guide">📚 科学辅导指南</button>
+    </div>
+
+    <!-- 1. 试卷展示区 -->
+    <section class="tabpane on" id="pane-paper">
+      <div class="paper-toolbar no-print">
+        <div class="toolbar-group">
+          <span class="toolbar-title">📄 试卷预览</span>
+          <span class="preview-badge" id="previewBadge">A4 1页满卷 · 48题</span>
+        </div>
+        <div class="toolbar-actions">
+          <div class="font-controls">
+            <span>🔤 字号:</span>
+            <button type="button" class="btn-font-pt" data-pt="13.5">13.5</button>
+            <button type="button" class="btn-font-pt active" data-pt="14.5">14.5</button>
+            <button type="button" class="btn-font-pt" data-pt="15">15</button>
+            <button type="button" class="btn-font-pt" data-pt="16">16</button>
+          </div>
+          <button type="button" class="btn-tool active" id="btnToggleTags" title="在网页上显示或隐藏回炉/复习等标记">🏷️ 标记: 显示</button>
+          <button type="button" class="btn-tool" id="btnQuickAns" title="卷面快速显示/隐藏参考答案">👀 参考答案: 隐藏</button>
+          <div class="zoom-controls">
+            <span>🔍 缩放:</span>
+            <button type="button" class="btn-zoom active" data-zoom="100">100%</button>
+            <button type="button" class="btn-zoom" data-zoom="90">90%</button>
+            <button type="button" class="btn-zoom" data-zoom="fit">适应屏幕</button>
+          </div>
+          <button type="button" class="btn-print-quick" id="btnQuickPrint">🖨️ 打印 A4</button>
+        </div>
+      </div>
+      <div class="paper-preview-container">
+        <div class="stack" id="paper"></div>
+      </div>
+    </section>
+
+    <!-- 2. 读题乐园与互动练习 -->
+    <section class="tabpane" id="pane-reading">
+      <div class="flow" style="margin:0 auto;font-size:16pt" id="readingPane"></div>
+    </section>
+
+    <!-- 3. 妮妮错题本 (满足需求 5) -->
+    <section class="tabpane" id="pane-errors">
+      <div class="error-page-header">
+        <div class="error-stats-text">
+          妮妮目前有 <b id="unresolvedCount">0</b> 道待攻克的错题。<br>
+          <span style="font-size:12px;color:#64748b">系统已自动将这些错题及同族变式纳入每日智能出题与强化练习中。</span>
+        </div>
+        <div>
+          <button class="warm" id="btnGenErrorSheet2" type="button">🎯 一键生成这批错题的专属巩固卷</button>
+        </div>
+      </div>
+      <div class="error-list" id="errorListContainer">
+        <p class="empty">🎉 妮妮太棒了！目前没有错题记录！</p>
+      </div>
+    </section>
+
+    <!-- 4. 妮妮成长足迹与掌握情况 -->
+    <section class="tabpane" id="pane-progress">
+      <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin-bottom:16px;">
+        <h3 style="margin-top:0;font-size:16px;color:#0f172a">👧 妮妮的口算成长档案</h3>
+        <p style="color:#64748b;font-size:13px;margin:4px 0 12px">上海嘉定华五小学（徐行镇）· 一年级数学天天练</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:10px">
+          <div class="stat-pill"><b id="pSheets">0 张</b><span>已练试卷</span></div>
+          <div class="stat-pill"><b id="pQuestions">0 题</b><span>已答题目</span></div>
+          <div class="stat-pill"><b id="pAccuracy">100%</b><span>平均正确率</span></div>
+          <div class="stat-pill"><b id="pStars">0 颗</b><span>荣誉小星星</span></div>
+        </div>
+      </div>
+
+      <h4>各知识点正确率与掌握状态</h4>
+      <div id="mastery"></div>
+      <h4>下一步进阶建议（知识图谱推进）</h4>
+      <div id="advice"></div>
+      <h4>卡住时先修回溯</h4>
+      <div id="backtrack"></div>
+      <h4>近期练习历史记录</h4>
+      <div id="historyList"></div>
+    </section>
+
+    <!-- 5. 知识图谱视图 -->
+    <section class="tabpane" id="pane-graph">
+      <p class="dim">红实线＝硬先修（不会就学不了），灰虚线＝软先修。点节点看掌握标准与回溯链。</p>
+      <div class="graphwrap">
+        <div class="gcanvas" id="graphSvg"></div>
+        <div id="graphDetail"><span class="dim">点左图任一知识点查看详情。</span><p id="pyCov" class="dim"></p></div>
+      </div>
+    </section>
+
+    <!-- 6. 云端同步与 Cloudflare KV 部署 (满足需求 4) -->
+    <section class="tabpane" id="pane-cloud">
+      <div class="cloud-status-card">
+        <div id="cloudStatusIndicator" class="cloud-pill local">🟡 本地模式 (数据保存在浏览器)</div>
+        <p style="font-size:13.5px;color:#475569;margin:6px 0 12px">
+          天天口算支持一键部署到 <b>GitHub + Cloudflare Pages</b>，绑定 <b>Cloudflare KV</b> 边缘数据库记录数据，100% 免费、全球极速加速、手机/平板/电脑随时同步！
+        </p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="primary" id="btnSyncCloud" type="button">☁️ 立即备份到云端</button>
+          <button id="btnPullCloud" type="button">📥 从云端拉取数据覆盖</button>
+          <button id="btnExportJson" type="button">💾 导出数据备份文件 (.json)</button>
+          <button id="btnImportJson" type="button">📂 导入备份文件</button>
+          <input type="file" id="fileImport" accept=".json" style="display:none">
+        </div>
+      </div>
+
+      <div class="guide" style="max-width:none">
+        <h2>🛠️ Cloudflare Pages + KV 极简部署指南（好操作吗？非常简单，3 分钟即可完成）</h2>
+        <p>本项目已内置 Cloudflare Pages Functions 接口（<code>functions/api/sync.js</code>）和 <code>wrangler.toml</code> 配置文件，零代码改动即可部署。</p>
+        
+        <div class="deploy-steps">
+          <div class="step-item">
+            <h4>第 1 步：将代码推送到你的 GitHub 仓库</h4>
+            <p>在当前项目文件夹运行以下命令（若已上传则直接看下一步）：</p>
+            <code>git init &amp;&amp; git add . &amp;&amp; git commit -m "feat: 妮妮口算天天练" &amp;&amp; git push</code>
+          </div>
+
+          <div class="step-item">
+            <h4>第 2 步：在 Cloudflare 创建 Pages 项目</h4>
+            <ol style="margin:4px 0;padding-left:20px">
+              <li>打开 <a href="https://dash.cloudflare.com" target="_blank">Cloudflare 控制台</a>，左侧菜单点击 <b>Workers &amp; Pages</b>。</li>
+              <li>点击 <b>Create Application</b> -&gt; 选择 <b>Pages</b> 选项卡 -&gt; 点击 <b>Connect to Git</b>。</li>
+              <li>授权并选中你的 GitHub 仓库，点击 <b>Begin setup</b>。</li>
+              <li><b>构建设置</b>：Framework preset 选 <code>None</code>，Build command 留空，Build output directory 留空或填 <code>.</code>。</li>
+              <li>点击 <b>Save and Deploy</b>，几十秒后你的专属域名就生成了（如 <code>https://nini-kousuan.pages.dev</code>）！</li>
+            </ol>
+          </div>
+
+          <div class="step-item">
+            <h4>第 3 步：创建并绑定 KV 数据库（记录妮妮数据）</h4>
+            <ol style="margin:4px 0;padding-left:20px">
+              <li>在 Cloudflare 左侧导航栏点击 <b>Storage &amp; Databases</b> -&gt; <b>KV</b>。</li>
+              <li>点击 <b>Create Namespace</b>，输入名称 <code>KOUSUAN_KV</code>，点击 Add。</li>
+              <li>回到刚创建的 Pages 项目页面，点击顶部的 <b>Settings</b> -&gt; <b>Functions</b>。</li>
+              <li>在页面下方找到 <b>KV namespace bindings</b>，点击 <b>Add binding</b>。</li>
+              <li>Variable name 填写：<code>KOUSUAN_KV</code>，KV namespace 选择刚刚创建的 <code>KOUSUAN_KV</code>。</li>
+              <li>点击 Save，重新部署一次。就搞定了！</li>
+            </ol>
+          </div>
+
+          <div class="step-item">
+            <h4>第 4 步：体验多端自动同步</h4>
+            <p>部署完成后，无论是电脑还是 iPad、手机打开你的专属网址，系统都会自动识别到云端数据库（状态变为绿色 🟢 已连接），妮妮每次做题、错题本、打卡历史都会自动实时云端备份，换设备不丢失！</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. 科学辅导与文献指南 -->
+    <section class="tabpane" id="pane-guide"><div class="guide" id="guideBody"></div></section>
+
+    <!-- 底部批改交互条 (满足需求：默认正确，点一下红色是错，再点取消，无多余错因标签) -->
+    <div class="markbar no-print">
+      <div class="markbar-tip">
+        <span class="markbar-icon">📝</span>
+        <span><b>在线批改：</b>默认全部正确。直接点击题目变红（标错），再次点击可取消。</span>
+      </div>
+      <div class="markbar-stats">
+        <span>共 <b id="gradeTotal">48</b> 题</span>
+        <span class="sep">·</span>
+        <span>错题: <b id="wrongCount" class="text-danger">0</b> 题</span>
+        <span class="sep">·</span>
+        <span>得分: <b id="scoreDisplay" class="text-success">100</b> 分</span>
+      </div>
+      <div class="markbar-actions">
+        <button type="button" id="btnResetGrade" class="btn-subtle">全部重置为对</button>
+        <button type="button" class="primary" id="btnFinishGrading">✅ 提交批改并记录成绩</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- 练习完成结算与星星奖励弹窗 -->
+<div class="modal-overlay" id="modalReward" style="display:none">
+  <div class="modal-card">
+    <div class="modal-stars" id="modalStars">⭐⭐⭐</div>
+    <div class="modal-title" id="modalTitle">妮妮今天太棒啦！</div>
+    <div class="modal-msg" id="modalMsg">完成了 48 道口算练习，用时 6 分钟，正确率 100%！</div>
+    <button class="primary" id="btnCloseModal" type="button" style="width:100%;padding:10px">收下小星星，明天继续加油！</button>
+  </div>
+</div>
+
+<script src="js/graph.data.js"></script>
+<script src="js/core.js"></script>
+<script src="js/items.js"></script>
+<script src="js/plan.js"></script>
+<script src="js/reading.js"></script>
+<script src="js/render.js"></script>
+<script src="js/cloud.js"></script>
+<script src="js/guide.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

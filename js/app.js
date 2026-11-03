@@ -44,7 +44,8 @@ function buildControls() {
   $('#showZiCard').checked = cfg.showZiCard !== false;
   $('#fluOnly').checked = !!cfg.fluOnly;
   $('#skipWord').checked = !!cfg.skipWord;
-  $('#skipBond').checked = cfg.skipBond !== false;
+  cfg.skipBond = cfg.skipBond !== false;
+  $('#skipBond').checked = cfg.skipBond;
   $('#annotate').value = cfg.annotate || 'full';
   $('#adaptiveErrors').checked = cfg.adaptiveErrors !== false;
 

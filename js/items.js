@@ -197,7 +197,7 @@ const FAMILIES = [
   { // 数的分与合（不用方块，用括号留空）
     id: 'bond', label: '数的分合', tier: 0, think: 1, w: 6,
     make(sp, lvl, cfg) {
-      if (!sp.bond || (cfg && cfg.skipBond)) return null;
+      if (!sp.bond || (cfg && cfg.skipBond !== false)) return null;
       for (let k = 0; k < 20; k++) {
         const n = R.int(4, sp.lim);
         const a = R.int(2, n - 2);
@@ -520,7 +520,7 @@ function familiesFor(sp, cfg) {
   allow.push('add');
   if (!sp.addOnly) allow.push('sub');
   if (sp.chain || sp.lim >= 10) allow.push('chain');
-  if (sp.bond && !(cfg && cfg.skipBond)) allow.push('bond');
+  if (sp.bond && cfg && cfg.skipBond === false) allow.push('bond');
   if (sp.lim >= 10 || sp.carry || sp.cmp) allow.push('cmp-expr');
   allow.push('miss');
   if (sp.lim >= 10) allow.push('equiv');

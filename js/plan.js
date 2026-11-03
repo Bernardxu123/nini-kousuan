@@ -51,7 +51,11 @@ const DEFAULT_CFG = {
   ladderAuto: true,   // 按正确率自动升降阶梯
 };
 
-function loadCfg() { return { ...DEFAULT_CFG, ...Store.get(CFG_KEY, {}) }; }
+function loadCfg() {
+  const c = { ...DEFAULT_CFG, ...Store.get(CFG_KEY, {}) };
+  if (c.skipBond === undefined) c.skipBond = true;
+  return c;
+}
 function saveCfg(c) { Store.set(CFG_KEY, c); }
 
 /* ---------- 台账 ---------- */
@@ -160,7 +164,7 @@ function sections(cfg) {
   }
   const out = [];
   const fluFams = ['add', 'sub', 'chain'];
-  if (!cfg.skipBond) fluFams.push('bond');
+  if (cfg.skipBond === false) fluFams.push('bond');
   if (f > 0) out.push({ key: 'fluency', page: 1, title: '一、口算（直接写得数）', want: f, fams: fluFams });
   if (t > 0) out.push({ key: 'think', page: 1, title: '二、变式（★ 要动脑筋）', want: t, fams: ['miss', 'equiv', 'cmp-expr', 'maxfill', 'sort', 'between'] });
   if (w > 0 && !noWord && cfg.wordMix > 0) out.push({ key: 'word', page: 2, title: '三、读题解决问题', want: w, fams: ['w-join', 'w-take', 'w-diff', 'w-extra', 'w-2step', 'w-ask', 'w-same', 'w-tell'] });
@@ -168,7 +172,7 @@ function sections(cfg) {
 }
 
 function makeOne(famId, sp, cfg, L, used, relax) {
-  if (cfg.skipBond && famId === 'bond') return null;
+  if (cfg.skipBond !== false && famId === 'bond') return null;
   const fam = FAM_BY_ID[famId];
   if (!fam) return null;
   const errs = [];

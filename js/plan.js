@@ -340,24 +340,38 @@ function packThink(arr) {
   return out;
 }
 
-/* 交叉排列：同一题型不连续出现超过 2 次，且相邻题不共享同一个数族 */
+/* 交叉随机排列：随机打乱出题，锻炼快速辨识加减符号的大脑反应力；
+   同一运算符号连续出现不超过 2 次，且相邻题避免共享同一数族，
+   绝不形成固定列或固定周期的机械规律，迫使孩子每道题都认真看清运算符号。 */
 function interleaveMixed(arr) {
-  const buckets = {};
-  arr.forEach(i => (buckets[i.fam] || (buckets[i.fam] = [])).push(i));
+  if (!arr.length) return [];
+  const pool = R.shuffle(arr.slice());
   const out = [];
-  let guard = 0;
-  while (Object.values(buckets).some(b => b.length) && guard++ < 2000) {
-    const keys = Object.keys(buckets).filter(k => buckets[k].length);
-    // 优先选跟上一题不同族、且数族不重叠的
-    keys.sort((a, b) => {
-      const sa = (a === (out[out.length - 1] || {}).fam) ? -1 : 0;
-      const sb = (b === (out[out.length - 1] || {}).fam) ? -1 : 0;
-      const ca = buckets[a].length, cb = buckets[b].length;
-      const la = out.slice(-3).some(x => x.factKey === buckets[a][0].factKey) ? -1 : 0;
-      const lb = out.slice(-3).some(x => x.factKey === buckets[b][0].factKey) ? -1 : 0;
-      return (sb + lb) - (sa + la) || cb - ca;
-    });
-    out.push(buckets[keys[0]].shift());
+  const maxStreak = 2; // 最多连续 2 次相同题型
+
+  while (pool.length) {
+    const last1 = out[out.length - 1];
+    const last2 = out[out.length - 2];
+    const forbiddenFam = (last1 && last2 && last1.fam === last2.fam) ? last1.fam : null;
+
+    // 1. 过滤掉导致连续超过 2 次同题型的候选
+    let candidates = [];
+    for (let i = 0; i < pool.length; i++) {
+      if (forbiddenFam && pool[i].fam === forbiddenFam) continue;
+      candidates.push(i);
+    }
+    if (!candidates.length) {
+      candidates = pool.map((_, i) => i);
+    }
+
+    // 2. 优先挑选相邻题目不共享相同数族的候选（避免前一题刚做完 3+5=8，后一题紧接着就是 8-3=5）
+    const lastFacts = out.slice(-2).map(x => x.factKey).filter(Boolean);
+    const nonColliding = candidates.filter(idx => !lastFacts.includes(pool[idx].factKey));
+    const finalSelection = nonColliding.length ? nonColliding : candidates;
+
+    // 3. 随机选出一个，放入结果序列
+    const chosenIdx = R.pick(finalSelection);
+    out.push(pool.splice(chosenIdx, 1)[0]);
   }
   return out;
 }

@@ -10,6 +10,7 @@ const DEFAULT_CFG = {
   schoolName: '上海嘉定华五小学（徐行镇）',
   fluOnly: false,     // 只出口算（纯口算日：不出变式和读题）
   skipWord: false,    // 不出「读题解决问题」，份量还给口算/变式
+  skipBond: true,     // 排除合成分成汉字题（不要「分成/合成」，纯算式）
   targets: ['cnm_p010', 'cnm_p011', 'cnm_p012', 'cnm_p013'],
   autoPrereq: true,
   reviewRatio: 0.25,
@@ -158,13 +159,16 @@ function sections(cfg) {
     w = Math.max(0, cfg.count - f - t);
   }
   const out = [];
-  if (f > 0) out.push({ key: 'fluency', page: 1, title: '一、口算（直接写得数）', want: f, fams: ['add', 'sub', 'chain', 'bond'] });
+  const fluFams = ['add', 'sub', 'chain'];
+  if (!cfg.skipBond) fluFams.push('bond');
+  if (f > 0) out.push({ key: 'fluency', page: 1, title: '一、口算（直接写得数）', want: f, fams: fluFams });
   if (t > 0) out.push({ key: 'think', page: 1, title: '二、变式（★ 要动脑筋）', want: t, fams: ['miss', 'equiv', 'cmp-expr', 'maxfill', 'sort', 'between'] });
   if (w > 0 && !noWord && cfg.wordMix > 0) out.push({ key: 'word', page: 2, title: '三、读题解决问题', want: w, fams: ['w-join', 'w-take', 'w-diff', 'w-extra', 'w-2step', 'w-ask', 'w-same', 'w-tell'] });
   return out;
 }
 
 function makeOne(famId, sp, cfg, L, used, relax) {
+  if (cfg.skipBond && famId === 'bond') return null;
   const fam = FAM_BY_ID[famId];
   if (!fam) return null;
   const errs = [];

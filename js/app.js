@@ -44,6 +44,7 @@ function buildControls() {
   $('#showZiCard').checked = cfg.showZiCard !== false;
   $('#fluOnly').checked = !!cfg.fluOnly;
   $('#skipWord').checked = !!cfg.skipWord;
+  $('#skipBond').checked = cfg.skipBond !== false;
   $('#annotate').value = cfg.annotate || 'full';
   $('#adaptiveErrors').checked = cfg.adaptiveErrors !== false;
 
@@ -238,11 +239,13 @@ function setOnePage48Mode() {
   cfg.count = 48;
   cfg.fontPt = 14.5;
   cfg.skipWord = true;
+  cfg.skipBond = true;
   cfg.showZiCard = false;
   cfg.cols = 4;
   $('#fontPt').value = 14.5;
   $('#count').value = 48;
   $('#skipWord').checked = true;
+  if ($('#skipBond')) $('#skipBond').checked = true;
   $('#showZiCard').checked = false;
   syncFontPtButtons(14.5);
   saveCfg(cfg);
@@ -518,7 +521,7 @@ function init() {
   $('#gap').onchange = e => { cfg.gap = e.target.value; saveCfg(cfg); paint(); };
   $('#annotate').onchange = e => { cfg.annotate = e.target.value; saveCfg(cfg); paint(); };
 
-  ['strictDedup', 'showAnswer', 'showBar', 'showWordCard', 'showZiCard', 'showExample', 'autoPrereq', 'fluOnly', 'skipWord', 'adaptiveErrors'].forEach(k => {
+  ['strictDedup', 'showAnswer', 'showBar', 'showWordCard', 'showZiCard', 'showExample', 'autoPrereq', 'fluOnly', 'skipWord', 'skipBond', 'adaptiveErrors'].forEach(k => {
     $('#' + k).onchange = e => { cfg[k] = e.target.checked; saveCfg(cfg); generate(); };
   });
 

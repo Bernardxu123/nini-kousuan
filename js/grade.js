@@ -45,7 +45,21 @@ function updateCloudBadge() {
   }
 }
 
-// 加载活跃试卷
+// 本地错题点选状态暂存，防止手机意外刷新丢失批改进度
+function saveBadNos() {
+  if (!currentSheet || !currentSheet.sheetId) return;
+  Store.set('ks_bad_' + currentSheet.sheetId, Array.from(badNos));
+}
+function restoreBadNos(sheetId) {
+  const arr = Store.get('ks_bad_' + sheetId, []);
+  badNos.clear();
+  arr.forEach(n => badNos.add(String(n)));
+}
+function clearSavedBadNos(sheetId) {
+  if (sheetId) Store.set('ks_bad_' + sheetId, []);
+}
+
+// 加载活跃试卷（保持当前试卷与进度，只有按换题按钮才换新卷）
 async function loadActiveSheet() {
   $('#sheetTitle').textContent = '正在获取试卷...';
   $('#sheetMetaText').textContent = '请稍候...';
@@ -59,7 +73,8 @@ async function loadActiveSheet() {
   }
 
   currentSheet = sh;
-  badNos.clear();
+  // 恢复之前点选的错题，刷新页面不丢失
+  restoreBadNos(sh.sheetId);
 
   // 渲染卷头信息
   $('#sheetTitle').textContent = sh.title || '10以内的加减法 天天练';
@@ -142,6 +157,7 @@ function toggleQuestionStatus(no) {
       try { navigator.vibrate(18); } catch (_) {}
     }
   }
+  saveBadNos();
 
   // 同步更新两个视图的 DOM
   $$(`[data-no="${no}"]`).forEach(el => {
@@ -178,6 +194,7 @@ function updateCounters() {
 function resetAllRight() {
   if (!badNos.size) return;
   badNos.clear();
+  if (currentSheet) clearSavedBadNos(currentSheet.sheetId);
   $$('.matrix-cell, .list-cell').forEach(el => {
     el.classList.remove('bad');
     const b = el.querySelector('.mc-badge, .lc-status');
@@ -188,7 +205,7 @@ function resetAllRight() {
 
 // 工具栏与视图绑定
 function bindTools() {
-  // 刷新试卷
+  // 同步电脑端最新打印的试卷
   $('#btnRefreshSheet').onclick = async () => {
     const btn = $('#btnRefreshSheet');
     btn.style.transform = 'rotate(180deg)';
@@ -196,6 +213,25 @@ function bindTools() {
     await loadActiveSheet();
     setTimeout(() => { btn.style.transform = 'none'; }, 400);
   };
+
+  // 手机端主动生成新试卷按钮（只有点击时才换题目）
+  const btnNewMobile = $('#btnNewSheetMobile');
+  if (btnNewMobile) {
+    btnNewMobile.onclick = async () => {
+      if (!confirm('确定生成一套全新的 48 题天天练试卷吗？（将刷新题目）')) return;
+      const sh = createFallbackSheet();
+      sh.sheetId = 'sheet_' + Date.now();
+      sh.createdAt = new Date().toISOString();
+      currentSheet = sh;
+      badNos.clear();
+      clearSavedBadNos(sh.sheetId);
+      await Cloud.syncSheet(sh);
+      $('#sheetTitle').textContent = sh.title;
+      $('#sheetMetaText').textContent = `共 ${sh.items.length} 题 · 生成时间：刚刚生成`;
+      renderQuestions(sh);
+      updateCounters();
+    };
+  }
 
   // 矩阵 / 列表视图切换
   $$('.mode-btn').forEach(btn => {
@@ -347,6 +383,10 @@ async function saveGradingSession() {
   try {
     await Cloud.syncToCloud();
   } catch (_) {}
+
+  // 提交成功后清除暂存的错题标记
+  if (currentSheet) clearSavedBadNos(currentSheet.sheetId);
+  badNos.clear();
 
   // 重新渲染相关视图
   renderErrors();

@@ -77,6 +77,28 @@ body {
 .header-actions {
   display: flex;
   gap: 8px;
+  align-items: center;
+}
+.btn-header {
+  background: #f1f5f9;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  height: 36px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-header:active { background: #e2e8f0; }
+.btn-header.primary {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #2563eb;
 }
 .btn-icon {
   background: #f1f5f9;

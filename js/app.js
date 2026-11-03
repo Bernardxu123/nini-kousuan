@@ -159,7 +159,18 @@ function updateNiniProfileUI() {
   renderHistoryList();
 }
 
-/* ---------- 试卷生成 ---------- */
+/* ---------- 试卷加载与生成机制：页面刷新保持当前题目，仅按按钮时才生成新卷 ---------- */
+function loadOrGenerateSheet() {
+  const saved = Store.get(CURRENT_SHEET_KEY, null);
+  if (saved && saved.items && saved.items.length && saved.flu) {
+    sheet = saved;
+    paint(saved.title);
+    refreshStats();
+  } else {
+    generate();
+  }
+}
+
 function generate(forceSeed) {
   if (!cfg.targets.length) {
     $('#paper').innerHTML = '<p class="empty">请先在左侧勾选妮妮今天要练习的知识点。</p>';
@@ -169,6 +180,8 @@ function generate(forceSeed) {
   R.seed(hashStr((forceSeed || '') + todayKey() + '-' + Math.random().toFixed(6) + '-' + cfg.targets.join(',')));
   cfg.errorPaperMode = false;
   sheet = buildSheet(cfg, L);
+  sheet.sheetId = 'sheet_' + Date.now();
+  sheet.createdAt = new Date().toISOString();
   saveLedger(L);
   paint();
   refreshStats();
@@ -296,22 +309,26 @@ function renderQRCodes() {
 
 function syncCurrentSheet(sh, c, meta) {
   if (!sh || !sh.items || !sh.items.length) return;
+  const sheetId = sh.sheetId || ('sheet_' + Date.now());
+  const createdAt = sh.createdAt || new Date().toISOString();
+  const title = meta ? meta.title : (sh.title || '10以内的加减法 天天练');
   const payload = {
-    sheetId: 'sheet_' + Date.now(),
-    title: meta ? meta.title : '10以内的加减法 天天练',
+    sheetId,
+    title,
     childName: c.childName || '妮妮',
     schoolName: c.schoolName || '上海嘉定华五小学（徐行镇）',
     count: sh.items.length,
-    createdAt: new Date().toISOString(),
-    items: sh.items.map(it => ({
-      no: it.no,
-      prompt: it.prompt,
-      answer: String(it.answer),
-      fam: it.fam,
-      topicId: it.topicId,
-      factKey: it.factKey || ''
-    }))
+    createdAt,
+    flu: sh.flu || [],
+    think: sh.think || [],
+    word: sh.word || [],
+    secs: sh.secs || [],
+    items: sh.items
   };
+  sh.sheetId = sheetId;
+  sh.createdAt = createdAt;
+  sh.title = title;
+  Store.set(CURRENT_SHEET_KEY, payload);
   Cloud.syncSheet(payload);
 }
 
@@ -567,8 +584,16 @@ function init() {
   $('#gap').onchange = e => { cfg.gap = e.target.value; saveCfg(cfg); paint(); };
   $('#annotate').onchange = e => { cfg.annotate = e.target.value; saveCfg(cfg); paint(); };
 
-  ['strictDedup', 'showAnswer', 'showBar', 'showWordCard', 'showZiCard', 'showExample', 'autoPrereq', 'fluOnly', 'skipWord', 'skipBond', 'adaptiveErrors'].forEach(k => {
-    $('#' + k).onchange = e => { cfg[k] = e.target.checked; saveCfg(cfg); generate(); };
+  // 纯显示配置：修改时不重新生成试卷题目，只更新当前卷面呈现
+  ['showAnswer', 'showBar', 'showWordCard', 'showZiCard', 'showExample'].forEach(k => {
+    const el = $('#' + k);
+    if (el) el.onchange = e => { cfg[k] = e.target.checked; saveCfg(cfg); paint(); };
+  });
+
+  // 出题参数配置：修改后按新参数生成
+  ['strictDedup', 'autoPrereq', 'fluOnly', 'skipWord', 'skipBond', 'adaptiveErrors'].forEach(k => {
+    const el = $('#' + k);
+    if (el) el.onchange = e => { cfg[k] = e.target.checked; saveCfg(cfg); generate(); };
   });
 
   // 项数与连加连减绑定 (解决需求 6)
@@ -735,7 +760,7 @@ function init() {
   initCloudUI();
 
   $('#guideBody').innerHTML = GUIDE;
-  generate();
+  loadOrGenerateSheet();
   renderGraphView();
 }
 

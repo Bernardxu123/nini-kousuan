@@ -5,6 +5,10 @@ function sheetHeader(cfg, meta) {
   const child = cfg.childName || '妮妮';
   const school = cfg.schoolName || '上海嘉定华五小学（徐行镇）';
   return `<div class="sheet-head">
+  <div class="sheet-qr-box">
+    <div class="sheet-qr-canvas" title="手机扫码直接批改"></div>
+    <div class="sheet-qr-desc">📱 手机扫码批改</div>
+  </div>
   <div class="school-tag">${esc(school)} · 一年级数学天天练</div>
   <div class="title">
     <span>${esc(meta.title)}</span>

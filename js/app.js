@@ -216,6 +216,10 @@ function paint(customTitle) {
   syncModeUI();
   $('#readingPane').innerHTML = renderReadingPage(sheet, cfg);
   bindPaper();
+  // 渲染纸面右上角手机扫码极速批改二维码
+  renderQRCodes();
+  // 同步当前活跃试卷至云端与本地存储，供手机端极速批改
+  syncCurrentSheet(sheet, cfg, meta);
 
   // 计算排版高度与打印页数评估 (排除仅在屏幕显示的家长讲评答案页)
   const printFlows = $$('#paper .flow').filter(f => !f.classList.contains('no-print'));
@@ -268,6 +272,47 @@ function updateGradeSummary() {
     elScore.textContent = String(score);
     elScore.className = score === 100 ? 'text-success' : score >= 90 ? 'text-primary' : 'text-danger';
   }
+}
+
+let cachedQrSvg = '';
+async function getGradeQrSvg() {
+  if (cachedQrSvg) return cachedQrSvg;
+  if (typeof QRCode !== 'undefined') {
+    const url = window.location.origin + '/grade.html';
+    try {
+      cachedQrSvg = await QRCode.toString(url, { type: 'svg', margin: 0, width: 48 });
+    } catch (_) {}
+  }
+  return cachedQrSvg;
+}
+
+function renderQRCodes() {
+  getGradeQrSvg().then(svg => {
+    if (svg) {
+      $$('.sheet-qr-canvas').forEach(el => { el.innerHTML = svg; });
+    }
+  });
+}
+
+function syncCurrentSheet(sh, c, meta) {
+  if (!sh || !sh.items || !sh.items.length) return;
+  const payload = {
+    sheetId: 'sheet_' + Date.now(),
+    title: meta ? meta.title : '10以内的加减法 天天练',
+    childName: c.childName || '妮妮',
+    schoolName: c.schoolName || '上海嘉定华五小学（徐行镇）',
+    count: sh.items.length,
+    createdAt: new Date().toISOString(),
+    items: sh.items.map(it => ({
+      no: it.no,
+      prompt: it.prompt,
+      answer: String(it.answer),
+      fam: it.fam,
+      topicId: it.topicId,
+      factKey: it.factKey || ''
+    }))
+  };
+  Cloud.syncSheet(payload);
 }
 
 function bindPaper() {
@@ -648,6 +693,37 @@ function init() {
   };
   $('#btnFinishGrading').onclick = () => finishGrading();
   $('#btnCloseModal').onclick = () => { $('#modalReward').style.display = 'none'; };
+
+  // 手机端访问横幅引导
+  if (window.innerWidth < 768) {
+    const banner = $('#mobileTipBanner');
+    if (banner) banner.style.display = 'block';
+  }
+
+  // 手机批改扫码弹窗
+  const btnShowMobileQr = $('#btnShowMobileQr');
+  if (btnShowMobileQr) {
+    btnShowMobileQr.onclick = async () => {
+      const modal = $('#modalMobileQr');
+      if (!modal) return;
+      modal.style.display = 'flex';
+      const url = window.location.origin + '/grade.html';
+      const urlEl = $('#pcQrUrl');
+      if (urlEl) urlEl.textContent = url;
+      const container = $('#pcQrContainer');
+      if (container) {
+        const svg = await getGradeQrSvg();
+        if (svg) container.innerHTML = svg;
+      }
+    };
+  }
+  const btnCloseMobileQr = $('#btnCloseMobileQr');
+  if (btnCloseMobileQr) {
+    btnCloseMobileQr.onclick = () => {
+      const modal = $('#modalMobileQr');
+      if (modal) modal.style.display = 'none';
+    };
+  }
 
   $('#btnClear').onclick = () => {
     if (!confirm('确定清空本地练习台账与掌握记录？（历史卷将允许重复出现）')) return;

@@ -2,6 +2,8 @@
 // 支持本地离线运行（localStorage）与 Cloudflare Edge KV 全球云端实时同步双模式
 'use strict';
 
+const CURRENT_SHEET_KEY = 'kousuan_current_sheet';
+
 const Cloud = {
   status: 'checking', // 'connected' | 'local_only' | 'kv_unbound' | 'syncing' | 'error'
   lastSyncTime: null,
@@ -42,7 +44,39 @@ const Cloud = {
       errors: Store.get(NINI_ERRORS_KEY, []),
       history: Store.get(NINI_HISTORY_KEY, []),
       mastery: Store.get(PROF_KEY, {}),
+      sheet: Store.get(CURRENT_SHEET_KEY, null),
     };
+  },
+
+  // 同步本地活跃试卷到云端
+  async syncSheet(sheet) {
+    if (!sheet) return;
+    Store.set(CURRENT_SHEET_KEY, sheet);
+    try {
+      const res = await fetch('/api/sheet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ child: 'nini', sheet }),
+      });
+      return await res.json();
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  },
+
+  // 从云端或本地获取当前活跃试卷
+  async fetchSheet() {
+    try {
+      const res = await fetch('/api/sheet?child=nini');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.ok && json.hasSheet && json.sheet) {
+          Store.set(CURRENT_SHEET_KEY, json.sheet);
+          return json.sheet;
+        }
+      }
+    } catch (_) {}
+    return Store.get(CURRENT_SHEET_KEY, null);
   },
 
   // 同步本地数据到云端
@@ -84,6 +118,7 @@ const Cloud = {
         if (d.errors) Store.set(NINI_ERRORS_KEY, d.errors);
         if (d.history) Store.set(NINI_HISTORY_KEY, d.history);
         if (d.mastery) Store.set(PROF_KEY, d.mastery);
+        if (d.sheet) Store.set(CURRENT_SHEET_KEY, d.sheet);
         Cloud.lastSyncTime = d.updatedAt ? new Date(d.updatedAt) : new Date();
         return { ok: true, message: '已从云端拉取最新数据并恢复！' };
       }
@@ -119,6 +154,7 @@ const Cloud = {
         if (d.errors) Store.set(NINI_ERRORS_KEY, d.errors);
         if (d.history) Store.set(NINI_HISTORY_KEY, d.history);
         if (d.mastery) Store.set(PROF_KEY, d.mastery);
+        if (d.sheet) Store.set(CURRENT_SHEET_KEY, d.sheet);
         if (callback) callback({ ok: true, message: '数据导入成功！' });
       } catch (err) {
         if (callback) callback({ ok: false, message: '备份文件解析失败：' + err.message });

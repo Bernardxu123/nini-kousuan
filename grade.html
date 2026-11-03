@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#ffffff">
+<title>妮妮口算天天练 · 手机极速批改</title>
+<link rel="stylesheet" href="css/grade.css?v=4">
+</head>
+<body>
+
+<!-- 顶部导航条 -->
+<header class="app-header">
+  <div class="brand-wrap">
+    <div class="brand-title">
+      <span>👧 妮妮口算天天练</span>
+      <span class="brand-tag">手机批改</span>
+    </div>
+    <div class="brand-sub">上海嘉定华五小学 · 一年级数学天天练</div>
+  </div>
+  <div class="header-actions">
+    <button type="button" class="btn-icon" id="btnRefreshSheet" title="拉取云端最新试卷">🔄</button>
+  </div>
+</header>
+
+<!-- 主内容区域：三大面板 -->
+
+<!-- 1. 极速批改面板 -->
+<main class="tab-content active" id="pane-grading">
+  <!-- 当前试卷信息卡片 -->
+  <div class="sheet-banner" id="sheetBanner">
+    <div class="sb-left">
+      <h2 id="sheetTitle">正在加载最新试卷...</h2>
+      <p id="sheetMetaText">请稍候，正在连接云端...</p>
+    </div>
+    <div class="sb-right">
+      <div class="cloud-pill" id="cloudStatusBadge">🟢 云端同步</div>
+    </div>
+  </div>
+
+  <!-- 工具栏：提示与视图切换 -->
+  <div class="view-tools">
+    <div class="tip-text">默认<b>全部正确</b>，点一下标红为错</div>
+    <div class="mode-toggle">
+      <button type="button" class="mode-btn active" data-mode="matrix">48格矩阵</button>
+      <button type="button" class="mode-btn" data-mode="list">列表</button>
+    </div>
+  </div>
+
+  <!-- 48格气泡矩阵 (Direction C: 推荐) -->
+  <div class="matrix-container" id="matrixGrid"></div>
+
+  <!-- 详细列表视图 (备用) -->
+  <div class="list-container" id="listGrid" style="display:none"></div>
+
+  <!-- 悬浮底部操作栏 -->
+  <div class="floating-bar" id="floatingBar">
+    <div class="fb-stats">
+      <div class="fb-counts">
+        <span class="cnt-total" id="txtTotal">共 48 题</span>
+        <span class="cnt-right" id="txtRight">✅ 对 48</span>
+        <span class="cnt-wrong" id="txtWrong">❌ 错 0</span>
+      </div>
+      <div class="fb-score" id="txtScore">100 分</div>
+    </div>
+    <div class="fb-actions">
+      <button type="button" class="btn-reset" id="btnResetAll">全部重置为对</button>
+      <button type="button" class="btn-submit" id="btnSubmitGrade">
+        <span>✨ 完成批改并提交</span>
+      </button>
+    </div>
+  </div>
+</main>
+
+<!-- 2. 妮妮错题本面板 -->
+<section class="tab-content" id="pane-errors">
+  <div class="pane-wrapper">
+    <div class="section-card">
+      <h3>
+        <span>📕 妮妮待攻克错题</span>
+        <span style="font-size:12px;color:#ef4444;font-weight:700" id="errorCountBadge">0 道</span>
+      </h3>
+      <p style="font-size:12px;color:#64748b;margin:0 0 12px">
+        错题会在每日电脑出题时自动安排针对回炉强化练习。
+      </p>
+      <div id="mobileErrorList"></div>
+    </div>
+  </div>
+</section>
+
+<!-- 3. 学情足迹面板 -->
+<section class="tab-content" id="pane-progress">
+  <div class="pane-wrapper">
+    <!-- 4个核心数据指标 -->
+    <div class="stat-grid">
+      <div class="stat-box">
+        <div class="stat-val" id="statSheets">0</div>
+        <div class="stat-lbl">已练试卷 (张)</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val" id="statQuestions">0</div>
+        <div class="stat-lbl">累计做题 (道)</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val" id="statAccuracy">100%</div>
+        <div class="stat-lbl">综合正确率</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val" id="statStars" style="color:#f59e0b">0 ⭐</div>
+        <div class="stat-lbl">荣誉小星星</div>
+      </div>
+    </div>
+
+    <!-- 知识点掌握度进度 -->
+    <div class="section-card">
+      <h3>各知识点掌握度</h3>
+      <div id="mobileMasteryList"></div>
+    </div>
+
+    <!-- 近期练习历史记录 -->
+    <div class="section-card">
+      <h3>近期练习打卡记录</h3>
+      <div id="mobileHistoryList"></div>
+    </div>
+  </div>
+</section>
+
+<!-- 底部主标签栏 -->
+<nav class="main-nav" id="mainNav">
+  <button type="button" class="nav-item active" data-tab="grading">
+    <span class="nav-icon">📝</span>
+    <span>极速批改</span>
+  </button>
+  <button type="button" class="nav-item" data-tab="errors">
+    <span class="nav-icon">📕</span>
+    <span>妮妮错题本</span>
+  </button>
+  <button type="button" class="nav-item" data-tab="progress">
+    <span class="nav-icon">📊</span>
+    <span>学情足迹</span>
+  </button>
+</nav>
+
+<!-- 批改完成结算激励弹窗 -->
+<div class="modal-mask" id="modalReward">
+  <div class="modal-card">
+    <div class="modal-stars" id="mStars">⭐⭐⭐</div>
+    <h3 class="modal-title" id="mTitle">满分！妮妮太棒了！</h3>
+    <p class="modal-desc" id="mDesc">完成了全部 48 道题，全部正确！获得 3 颗小星星！</p>
+
+    <!-- 用时选择 -->
+    <div class="time-picker-section">
+      <div class="tps-label">⏱️ 妮妮本次做题用时（分钟）：</div>
+      <div class="time-pills" id="timePills">
+        <div class="time-pill" data-min="4">4分</div>
+        <div class="time-pill" data-min="5">5分</div>
+        <div class="time-pill active" data-min="6">6分</div>
+        <div class="time-pill" data-min="7">7分</div>
+        <div class="time-pill" data-min="8">8分</div>
+        <div class="time-pill" data-min="10">10分</div>
+      </div>
+    </div>
+
+    <div class="modal-btns">
+      <button type="button" class="btn-primary-block" id="btnConfirmReward">确认记录并同步成绩</button>
+      <button type="button" class="btn-secondary-block" id="btnCancelReward">返回修改</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/graph.data.js?v=4"></script>
+<script src="js/core.js?v=4"></script>
+<script src="js/cloud.js?v=4"></script>
+<script src="js/grade.js?v=4"></script>
+</body>
+</html>

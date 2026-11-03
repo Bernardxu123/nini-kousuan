@@ -192,7 +192,45 @@ button.warm:hover { background: #fde68a; }
 .flow.keywrap { break-before: page; }
 
 /* 卷头：包含学校、妮妮姓名与做题信息 */
-.sheet-head { border-bottom: 2px solid var(--ink); padding-bottom: 3px; margin-bottom: 4px; }
+.sheet-head {
+  position: relative;
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: 3px;
+  margin-bottom: 4px;
+  padding-right: 76px;
+}
+.sheet-qr-box {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: 72px;
+}
+.sheet-qr-canvas {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  border-radius: 4px;
+}
+.sheet-qr-canvas svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.sheet-qr-desc {
+  font-size: 7.5px;
+  color: #475569;
+  line-height: 1.1;
+  margin-top: 1px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
 .school-tag { font-size: .60em; font-weight: 700; color: #1e3a8a; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 1px; }
 .sheet-head .title {
   font-size: 1.0em; font-weight: 800; display: flex;

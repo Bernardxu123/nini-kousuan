@@ -7,6 +7,9 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+<div id="mobileTipBanner" class="mobile-tip-banner" style="display:none;background:#eff6ff;color:#1e40af;border-bottom:1px solid #bfdbfe;padding:8px 14px;font-size:13px;text-align:center;font-weight:600">
+  📱 检测到您正在手机上访问，推荐使用专属极速批改版：<a href="grade.html" style="color:#2563eb;text-decoration:underline;margin-left:4px">立即进入手机批改 &gt;&gt;</a>
+</div>
 <div class="app">
 
   <aside class="side">
@@ -209,6 +212,7 @@
             <button type="button" class="btn-zoom" data-zoom="90">90%</button>
             <button type="button" class="btn-zoom" data-zoom="fit">适应屏幕</button>
           </div>
+          <button type="button" class="btn-tool" id="btnShowMobileQr" style="color:#2563eb;font-weight:700" title="在手机上直接点选批改，无需回电脑前">📱 手机批改</button>
           <button type="button" class="btn-print-quick" id="btnQuickPrint">🖨️ 打印 A4</button>
         </div>
       </div>
@@ -362,14 +366,26 @@
   </div>
 </div>
 
-<script src="js/graph.data.js?v=4"></script>
-<script src="js/core.js?v=4"></script>
-<script src="js/items.js?v=4"></script>
-<script src="js/plan.js?v=4"></script>
-<script src="js/reading.js?v=4"></script>
-<script src="js/render.js?v=4"></script>
-<script src="js/cloud.js?v=4"></script>
-<script src="js/guide.js?v=4"></script>
-<script src="js/app.js?v=4"></script>
+<!-- 手机批改扫码弹窗 -->
+<div class="modal-overlay" id="modalMobileQr" style="display:none">
+  <div class="modal-card" style="max-width:320px;text-align:center;padding:24px">
+    <h3 style="margin:0 0 8px;font-size:17px;color:#0f172a">📱 手机极速批改</h3>
+    <p style="font-size:13px;color:#64748b;margin:0 0 16px;line-height:1.4">用手机微信或系统相机扫一扫，手机端直接点选批改，无需回电脑前操作！</p>
+    <div id="pcQrContainer" style="display:flex;justify-content:center;margin-bottom:12px;background:#f8fafc;padding:12px;border-radius:12px;border:1px solid #e2e8f0"></div>
+    <div style="font-size:12px;color:#2563eb;font-weight:600;word-break:break-all;margin-bottom:16px" id="pcQrUrl">https://learn.290490.xyz/grade.html</div>
+    <button type="button" class="btn-tool" style="width:100%;padding:10px;font-weight:700" id="btnCloseMobileQr">关闭</button>
+  </div>
+</div>
+
+<script src="js/qrcode.min.js?v=5"></script>
+<script src="js/graph.data.js?v=5"></script>
+<script src="js/core.js?v=5"></script>
+<script src="js/items.js?v=5"></script>
+<script src="js/plan.js?v=5"></script>
+<script src="js/reading.js?v=5"></script>
+<script src="js/render.js?v=5"></script>
+<script src="js/cloud.js?v=5"></script>
+<script src="js/guide.js?v=5"></script>
+<script src="js/app.js?v=5"></script>
 </body>
 </html>

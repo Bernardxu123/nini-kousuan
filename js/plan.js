@@ -207,6 +207,7 @@ function makeOne(famId, sp, cfg, L, used, relax) {
 }
 
 function buildSheet(cfg, L) {
+  L = L || loadLedger();
   const prof = Store.get(PROF_KEY, {});
   const pool = nodePool(cfg, prof);
   const secs = sections(cfg);
@@ -239,16 +240,20 @@ function buildSheet(cfg, L) {
   }
 
   for (const sec of secs) {
-    const cap = Math.max(2, Math.ceil(sec.want * (sec.key === 'fluency' ? 0.40 : 0.60)));
+    // 动态计算每个题型的上限：如果可用题型少（如只留加减2项），cap 必须保证能均分凑满总题量
+    const minCap = Math.ceil(sec.want / 2); // 至少 50%，当只有2个题型时每种至少分 24 题凑满 48 题
+    const baseCap = Math.ceil(sec.want * (sec.key === 'fluency' ? 0.40 : 0.60));
+    const cap = Math.max(minCap, baseCap);
+
     const have = () => picked.filter(i => i.sec === sec.key).length;
     const attempt = relax => {
       let stall = 0;
-      while (have() < sec.want && stall < 90) {
+      while (have() < sec.want && stall < 120) {
         const node = pickNode(pool);
         if (!node) break;
         const sp = { ...specOf(node.id), id: node.id };
         const allowed = sec.fams.filter(f =>
-          familiesFor(sp, cfg).includes(f) && (used.byFam[f] || 0) < cap);
+          familiesFor(sp, cfg).includes(f) && (relax || (used.byFam[f] || 0) < cap));
         if (!allowed.length) { stall++; continue; }
         const hard = allowed.filter(f => cfg.hardFamilies.includes(f));
         // hard 题份量加倍但不绝对优先：绝对优先会让排序/区间这类非 hard 族永远轮不到
@@ -262,7 +267,26 @@ function buildSheet(cfg, L) {
       }
     };
     attempt(false);
-    attempt(true); // 数空间用完时宁可回炉旧题，也不交一张缺题的卷子
+    attempt(true); // 如果因为去重或题型限制没凑够，第二轮放宽限制补满题量，确保绝不缺题
+
+    // 第三道安全兜底：无条件填满，确保 100% 满卷 (严格满足用户设定的总题量)
+    if (have() < sec.want) {
+      let emergencyTries = 0;
+      while (have() < sec.want && emergencyTries < 300) {
+        emergencyTries++;
+        const node = pickNode(pool);
+        if (!node) break;
+        const sp = { ...specOf(node.id), id: node.id };
+        const allowed = sec.fams.filter(f => familiesFor(sp, cfg).includes(f));
+        if (!allowed.length) continue;
+        const f = R.pick(allowed);
+        const it = makeOne(f, sp, cfg, L, used, true);
+        if (it) {
+          it.sec = sec.key; it.secTitle = sec.title; it.review = node.role === 'review';
+          picked.push(it);
+        }
+      }
+    }
   }
 
   const lay = layout(picked);

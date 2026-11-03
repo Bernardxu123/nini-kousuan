@@ -1,9 +1,6 @@
 // 组卷：知识点选择 + 配比 + 双层去重（题面签名 / 数族签名），输出 A4 题单。
 'use strict';
 
-const CFG_KEY = 'ks.cfg.v1', PROF_KEY = 'ks.profile.v1', LEDGER_KEY = 'ks.ledger.v2', HIST_KEY = 'ks.history.v2';
-const NINI_PROFILE_KEY = 'ks.nini.profile.v1', NINI_ERRORS_KEY = 'ks.nini.errors.v1', NINI_HISTORY_KEY = 'ks.nini.history.v1';
-
 const DEFAULT_CFG = {
   count: 48,
   childName: '妮妮',

@@ -2,8 +2,6 @@
 // 支持本地离线运行（localStorage）与 Cloudflare Edge KV 全球云端实时同步双模式
 'use strict';
 
-const CURRENT_SHEET_KEY = 'kousuan_current_sheet';
-
 const Cloud = {
   status: 'checking', // 'connected' | 'local_only' | 'kv_unbound' | 'syncing' | 'error'
   lastSyncTime: null,

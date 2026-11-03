@@ -136,5 +136,9 @@ const Store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
 };
 
+const CFG_KEY = 'ks.cfg.v1', PROF_KEY = 'ks.profile.v1', LEDGER_KEY = 'ks.ledger.v2', HIST_KEY = 'ks.history.v2';
+const NINI_PROFILE_KEY = 'ks.nini.profile.v1', NINI_ERRORS_KEY = 'ks.nini.errors.v1', NINI_HISTORY_KEY = 'ks.nini.history.v1';
+const CURRENT_SHEET_KEY = 'ks.current.sheet.v1';
+
 const todayKey = (d = new Date()) =>
   `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;

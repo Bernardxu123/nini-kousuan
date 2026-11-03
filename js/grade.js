@@ -1,13 +1,6 @@
 // 妮妮口算天天练 · 手机专属极速批改核心逻辑
 'use strict';
 
-const NINI_PROFILE_KEY = 'kousuan_nini_profile';
-const NINI_ERRORS_KEY = 'kousuan_nini_errors';
-const NINI_HISTORY_KEY = 'kousuan_nini_history';
-const PROF_KEY = 'kousuan_prof_v1';
-const LEDGER_KEY = 'kousuan_ledger_v1';
-const CFG_KEY = 'kousuan_cfg_v1';
-
 let currentSheet = null;
 const badNos = new Set();
 let selectedMins = 6;

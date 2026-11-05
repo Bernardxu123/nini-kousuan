@@ -15,7 +15,10 @@
   --danger-text: #b91c1c;
   --star: #f59e0b;
   --font-math: "STIX Two Math", "Cambria Math", "Noto Sans Math", "PingFang SC", "Microsoft YaHei", sans-serif;
-  --safe-bottom: env(safe-area-inset-bottom, 16px);
+  /* 底部布局契约：导航条内容高度 + 悬浮批改栏高度（含 10px 上下内边距、统计行、按钮行） */
+  --nav-h: 58px;
+  --fb-h: 108px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -30,7 +33,7 @@ body {
   line-height: 1.5;
   user-select: none;
   -webkit-user-select: none;
-  padding-bottom: calc(90px + var(--safe-bottom));
+  padding-bottom: calc(var(--nav-h) + var(--safe-bottom));
 }
 
 /* 顶部状态条 */
@@ -357,17 +360,18 @@ body {
 }
 
 /* ================= 悬浮底部操作栏 ================= */
+/* 叠放在底部导航之上：底边 = 导航内容高度 + 安全区，避免按钮行被 nav 盖住 */
 .floating-bar {
   position: fixed;
-  bottom: 0;
+  bottom: calc(var(--nav-h) + var(--safe-bottom));
   left: 0;
   right: 0;
-  z-index: 60;
+  z-index: 70;
   background: rgba(255, 255, 255, 0.94);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-top: 1px solid var(--line);
-  padding: 10px 16px calc(10px + var(--safe-bottom));
+  padding: 10px 16px;
   box-shadow: 0 -4px 16px rgba(0,0,0,0.06);
 }
 .fb-stats {
@@ -421,6 +425,32 @@ body {
   gap: 6px;
 }
 .btn-submit:active { transform: translateY(1px); filter: brightness(0.95); }
+
+/* ================= 轻提示 Toast（js/grade.js 云同步状态） ================= */
+/* 契约：<div class="sync-toast ok|warn|err show">，悬浮在批改栏上方、导航之上 */
+.sync-toast {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 120;
+  bottom: calc(var(--nav-h) + var(--safe-bottom) + var(--fb-h) + 12px);
+  max-width: calc(100vw - 32px);
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  color: #fff;
+  background: rgba(15, 23, 42, 0.94);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+.sync-toast.show { opacity: 1; }
+.sync-toast.ok { background: #15803d; }
+.sync-toast.warn { background: #b45309; }
+.sync-toast.err { background: #b91c1c; }
 
 /* ================= 底部主导航标签 ================= */
 .tab-bar {
@@ -543,6 +573,11 @@ body {
 }
 .tab-content.active {
   display: block;
+}
+
+/* 批改面板底部留白：悬浮批改栏为 fixed，最后一行矩阵需额外避让 */
+#pane-grading {
+  padding-bottom: calc(var(--fb-h) + 12px);
 }
 
 .pane-wrapper {
@@ -670,14 +705,19 @@ body {
   bottom: 0;
   left: 0;
   right: 0;
-  z-index: 70;
+  z-index: 80;
+  /* 固定高度 = 导航内容高度 + 安全区，安全区只作为底部内边距 */
+  height: calc(var(--nav-h) + var(--safe-bottom));
   background: rgba(255, 255, 255, 0.98);
   border-top: 1px solid var(--line);
   display: flex;
-  padding: 6px 0 calc(6px + var(--safe-bottom));
+  align-items: stretch;
+  padding: 0 0 var(--safe-bottom);
 }
 .nav-item {
   flex: 1;
+  min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -688,7 +728,7 @@ body {
   border: none;
   background: transparent;
   cursor: pointer;
-  padding: 4px 0;
+  padding: 2px 0;
 }
 .nav-item.active {
   color: #2563eb;

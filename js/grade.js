@@ -16,33 +16,97 @@ document.addEventListener('DOMContentLoaded', async () => {
   bindTools();
   bindModal();
 
-  // 初始化云端并加载活跃试卷
+  // 1. 初始化云端状态徽章
   await Cloud.init();
   updateCloudBadge();
+
+  // 2. 连上云端时先拉取最新数据，手机端「学情足迹 / 错题本」才有内容
+  if (Cloud.isConnected()) {
+    // 本机若留有尚未上云的记录，先推送一次（服务端合并去重、不会覆盖），避免随后的拉取把离线数据冲掉
+    const localHistory = Store.get(NINI_HISTORY_KEY, []);
+    const localErrors = Store.get(NINI_ERRORS_KEY, []);
+    if ((localHistory && localHistory.length) || (localErrors && localErrors.length)) {
+      try { await Cloud.syncToCloud(); } catch (_) {}
+    }
+    // 失败静默：离线也能正常批改，只是学情停留在本地
+    try { await Cloud.pullFromCloud(); } catch (_) {}
+    updateCloudBadge();
+  }
+
+  // 3. 加载活跃试卷
   await loadActiveSheet();
 
-  // 渲染学情与错题
+  // 4. 渲染学情与错题
   renderErrors();
   renderProgress();
 });
 
-// 云端状态胶囊
+// 云端状态胶囊：已同步显示上次同步时间，离线提示本地保存
 function updateCloudBadge() {
   const badge = $('#cloudStatusBadge');
   if (!badge) return;
-  if (Cloud.status === 'connected') {
-    badge.textContent = '🟢 云端已连接';
-    badge.style.background = '#dcfce7';
-    badge.style.color = '#166534';
-  } else if (Cloud.status === 'kv_unbound') {
+
+  if (Cloud.status === 'kv_unbound') {
     badge.textContent = '🟡 本地离线 (KV未绑)';
     badge.style.background = '#fef9c3';
     badge.style.color = '#854d0e';
-  } else {
-    badge.textContent = '⚪ 本地模式';
-    badge.style.background = '#f1f5f9';
-    badge.style.color = '#475569';
+    return;
   }
+
+  if (Cloud.isConnected()) {
+    badge.style.background = '#dcfce7';
+    badge.style.color = '#166534';
+    if (Cloud.lastSyncTime) {
+      const t = Cloud.lastSyncTime instanceof Date ? Cloud.lastSyncTime : new Date(Cloud.lastSyncTime);
+      const hh = String(t.getHours()).padStart(2, '0');
+      const mm = String(t.getMinutes()).padStart(2, '0');
+      badge.textContent = `🟢 已同步 ${hh}:${mm}`;
+    } else {
+      badge.textContent = '🟢 云端已连接';
+    }
+    return;
+  }
+
+  badge.textContent = '🟡 离线·本地保存';
+  badge.style.background = '#fef9c3';
+  badge.style.color = '#854d0e';
+}
+
+// 静默拉取云端最新数据（防重入；离线/失败不打扰用户）
+let cloudRefreshing = false;
+async function refreshFromCloud() {
+  if (cloudRefreshing || !Cloud.isConnected()) return false;
+  cloudRefreshing = true;
+  try {
+    const res = await Cloud.pullFromCloud();
+    if (res && res.ok) {
+      updateCloudBadge();
+      return true;
+    }
+    return false;
+  } catch (_) {
+    return false;
+  } finally {
+    cloudRefreshing = false;
+  }
+}
+
+// 轻提示：复用/创建 div.sync-toast（class 追加 ok|warn|err 与 show），样式由 css/grade.css 提供
+let toastTimer = null;
+function showToast(msg, type = 'ok') {
+  let el = document.querySelector('.sync-toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'sync-toast';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  const t = type === 'warn' ? 'warn' : type === 'err' ? 'err' : 'ok';
+  el.className = `sync-toast show ${t}`;
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    el.classList.remove('show');
+  }, 2400);
 }
 
 // 本地错题点选状态暂存，防止手机意外刷新丢失批改进度
@@ -97,6 +161,11 @@ function formatTime(iso) {
   } catch (_) {
     return '今天';
   }
+}
+
+// 两位数字补零（月份/日/时分）
+function pad2(n) {
+  return String(n).padStart(2, '0');
 }
 
 // 渲染题目（矩阵与列表两种视图）
@@ -319,98 +388,137 @@ function bindModal() {
   };
 }
 
-// 记录批改成绩并回传云端
+// 记录批改成绩并同步云端（结构与电脑端 recordPracticeSession 完全对齐，便于多端合并）
 async function saveGradingSession() {
   if (!currentSheet || !currentSheet.items) return;
   const total = currentSheet.items.length;
   const wrongCount = badNos.size;
   const rightCount = total - wrongCount;
-  const accuracy = rightCount / total;
+  const accuracy = total > 0 ? rightCount / total : 1;
 
-  let stars = accuracy >= 1.0 ? 3 : accuracy >= 0.9 ? 2 : 1;
+  const stars = accuracy >= 1.0 ? 3 : accuracy >= 0.9 ? 2 : 1;
+  const now = new Date();
+  const today = todayKey(now);
 
-  // 1. 记录错题与掌握度
-  const errorItems = [];
+  // 1. 记录错题与掌握度（错题字段、掌握度字段都与电脑端一致；拉取后是在云端数据上累加而不是丢字段）
   const prof = Store.get(PROF_KEY, {});
-
   currentSheet.items.forEach(it => {
     const isBad = badNos.has(String(it.no));
-    if (isBad) {
-      errorItems.push(it);
-      recordErrorItem(it);
-    }
-    // 更新掌握度
-    if (it.topicId) {
-      if (!prof[it.topicId]) prof[it.topicId] = { seen: 0, right: 0, acc: 1 };
-      prof[it.topicId].seen += 1;
-      if (!isBad) prof[it.topicId].right += 1;
-      prof[it.topicId].acc = prof[it.topicId].right / prof[it.topicId].seen;
-    }
+    if (isBad) recordErrorItem(it);
+
+    if (!it.topicId) return;
+    const m = prof[it.topicId] || { seen: 0, right: 0, days: {}, causes: {} };
+    if (!m.days || typeof m.days !== 'object') m.days = {};
+    if (!m.causes || typeof m.causes !== 'object') m.causes = {};
+    m.seen = (m.seen || 0) + 1;
+    if (!isBad) m.right = (m.right || 0) + 1;
+    m.acc = m.seen ? m.right / m.seen : 1;
+    m.last = now.getTime();
+    const day = m.days[today] || { seen: 0, right: 0 };
+    day.seen = (day.seen || 0) + 1;
+    if (!isBad) day.right = (day.right || 0) + 1;
+    m.days[today] = day;
+    if (isBad) m.causes['计算失误'] = (m.causes['计算失误'] || 0) + 1;
+    prof[it.topicId] = m;
   });
   Store.set(PROF_KEY, prof);
 
-  // 2. 记录练习历史
+  // 2. 记录练习历史（date + timeStr 结构与电脑端兼容，服务端按 id 并集去重）
   const history = Store.get(NINI_HISTORY_KEY, []);
   const sessionRecord = {
-    date: new Date().toISOString(),
+    id: 'rec_' + now.getTime(),
+    date: `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`,
+    timeStr: `${pad2(now.getHours())}:${pad2(now.getMinutes())}`,
     total,
     correct: rightCount,
     wrong: wrongCount,
     accuracy,
     durationMinutes: selectedMins,
     stars,
-    sheetTitle: currentSheet.title || '口算天天练'
+    sheetTitle: currentSheet.title || '口算天天练',
+    targets: [...new Set(currentSheet.items.map(it => it.topicId).filter(Boolean))],
   };
   history.unshift(sessionRecord);
-  Store.set(NINI_HISTORY_KEY, history.slice(0, 100)); // 保留最近100次
+  Store.set(NINI_HISTORY_KEY, history.slice(0, 150)); // 与服务端上限一致
 
-  // 3. 更新档案统计
-  const profile = Store.get(NINI_PROFILE_KEY, { totalSheets: 0, totalQuestions: 0, totalStars: 0 });
+  // 3. 更新妮妮档案累计值（与电脑端 getNiniProfile 的字段对齐）
+  const profile = Store.get(NINI_PROFILE_KEY, {});
+  const lastDate = profile.lastDate || '';
+  if (!lastDate) {
+    profile.streak = 1;
+  } else if (lastDate !== today) {
+    profile.streak = (Number(today) - Number(lastDate) === 1) ? (profile.streak || 0) + 1 : 1;
+  }
+  profile.lastDate = today;
   profile.totalSheets = (profile.totalSheets || 0) + 1;
   profile.totalQuestions = (profile.totalQuestions || 0) + total;
-  profile.totalStars = (profile.totalStars || 0) + stars;
+  profile.totalCorrect = (profile.totalCorrect || 0) + rightCount;
+  const starTotal = (profile.stars || profile.totalStars || 0) + stars;
+  profile.stars = starTotal;
+  profile.totalStars = starTotal; // 两套字段名同值：PC 读 stars，手机旧逻辑读 totalStars
   Store.set(NINI_PROFILE_KEY, profile);
 
-  // 4. 同步至云端 Cloudflare KV
+  // 4. 同步云端：/api/sync 服务端合并写入，成功后会把合并快照写回本地
+  let synced = false;
   try {
-    await fetch('/api/records', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ child: 'nini', record: sessionRecord })
-    });
-  } catch (_) {}
-
-  try {
-    await Cloud.syncToCloud();
-  } catch (_) {}
+    const res = await Cloud.syncToCloud();
+    synced = !!(res && res.ok);
+  } catch (_) {
+    synced = false;
+  }
+  updateCloudBadge();
+  if (synced) showToast('✅ 已同步到云端', 'ok');
+  else showToast('⚠️ 已保存在本机，云端未连接', 'warn');
 
   // 提交成功后清除暂存的错题标记
   if (currentSheet) clearSavedBadNos(currentSheet.sheetId);
   badNos.clear();
+
+  // 提交后清空红色标记并重绘批改面板，避免切回批改页看到过期的红格与计数
+  if (currentSheet && currentSheet.items) {
+    renderQuestions(currentSheet);
+    updateCounters();
+  }
 
   // 重新渲染相关视图
   renderErrors();
   renderProgress();
 }
 
-// 记录单道错题
+// 记录单道错题（字段与电脑端 recordNiniError 对齐，便于服务端合并去重）
 function recordErrorItem(it) {
+  const nowIso = new Date().toISOString();
+  const sig = it.sig || it.factKey || it.prompt;
   const errors = Store.get(NINI_ERRORS_KEY, []);
-  const existing = errors.find(e => e.factKey === it.factKey || e.prompt === it.prompt);
+  // 同一题面只在未攻克的错题上累加，已攻克后再次做错视为新的错题（与电脑端一致）
+  const existing = errors.find(e => !e.resolved && (
+    (e.sig && sig && e.sig === sig) ||
+    (e.factKey && it.factKey && e.factKey === it.factKey) ||
+    (e.prompt && it.prompt && e.prompt === it.prompt)
+  ));
   if (existing) {
+    existing.failCount = (existing.failCount || existing.count || 1) + 1;
     existing.count = (existing.count || 1) + 1;
-    existing.lastWrongDate = new Date().toISOString();
+    existing.lastFailedAt = nowIso;
+    existing.lastWrongDate = nowIso;
   } else {
     errors.unshift({
       id: 'err_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+      date: nowIso.slice(0, 10),
+      createdTime: nowIso,
       prompt: it.prompt,
       answer: it.answer,
       fam: it.fam,
       topicId: it.topicId,
       factKey: it.factKey || it.prompt,
+      sig,
+      cause: '计算失误',
+      resolved: false,
+      failCount: 1,
       count: 1,
-      firstWrongDate: new Date().toISOString(),
-      lastWrongDate: new Date().toISOString()
+      firstWrongDate: nowIso,
+      lastWrongDate: nowIso,
+      lastFailedAt: nowIso,
     });
   }
   Store.set(NINI_ERRORS_KEY, errors);
@@ -432,25 +540,37 @@ function switchTab(tab) {
     pane.classList.toggle('active', pane.id === `pane-${tab}`);
   });
 
-  // 如果切换到错题或学情，刷新数据
-  if (tab === 'errors') renderErrors();
-  if (tab === 'progress') renderProgress();
-
   // 浮动操作栏仅在极速批改面板显示
   const fb = $('#floatingBar');
   if (fb) fb.style.display = tab === 'grading' ? 'block' : 'none';
+
+  // 切到「错题本 / 学情足迹」时先渲染本地，再静默拉云端最新数据补渲染（离线不报错）
+  if (tab === 'errors' || tab === 'progress') {
+    renderErrors();
+    renderProgress();
+    refreshFromCloud().then(ok => {
+      if (!ok) return;
+      renderErrors();
+      renderProgress();
+    });
+  }
 }
 
-// 渲染错题本
+// 渲染错题本（只展示未攻克的错题，角标数量与之一致）
 function renderErrors() {
   const listEl = $('#mobileErrorList');
   const badge = $('#errorCountBadge');
   if (!listEl) return;
 
   const errors = Store.get(NINI_ERRORS_KEY, []);
-  if (badge) badge.textContent = `${errors.length} 道`;
+  // 保留原始下标：已攻克的错题仍留在数组里（标记 resolved），点击按钮时要定位到原数组项
+  const active = errors
+    .map((err, idx) => ({ err, idx }))
+    .filter(x => x.err && !x.err.resolved);
 
-  if (!errors.length) {
+  if (badge) badge.textContent = `${active.length} 道`;
+
+  if (!active.length) {
     listEl.innerHTML = `
       <div class="empty-state">
         <div class="icon">🎉</div>
@@ -460,32 +580,38 @@ function renderErrors() {
     return;
   }
 
-  listEl.innerHTML = errors.map((err, idx) => `
+  listEl.innerHTML = active.map(({ err, idx }) => `
     <div class="error-card" data-idx="${idx}">
       <div class="ec-left">
         <div class="ec-q">${err.prompt}（答案：${err.answer}）</div>
-        <div class="ec-info">已错 ${err.count || 1} 次 · 题型：${famLabel(err.fam)}</div>
+        <div class="ec-info">已错 ${err.failCount || err.count || 1} 次 · 题型：${famLabel(err.fam)}</div>
       </div>
       <button type="button" class="btn-mastered" onclick="removeError(${idx})">✅ 已掌握</button>
     </div>
   `).join('');
 }
 
-// 移除错题（已掌握）
+// 标记错题为「已掌握」：只做本地更新 + 云端合并同步（不再 POST /api/errors）
 window.removeError = async function(idx) {
   const errors = Store.get(NINI_ERRORS_KEY, []);
-  if (idx >= 0 && idx < errors.length) {
-    errors.splice(idx, 1);
-    Store.set(NINI_ERRORS_KEY, errors);
-    renderErrors();
-    try {
-      await fetch('/api/errors', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ child: 'nini', errors })
-      });
-    } catch (_) {}
+  if (!(idx >= 0 && idx < errors.length)) return;
+  const item = errors[idx];
+  if (!item) return;
+
+  // 用 resolved 标记而不是删除：删除后服务端合并会从云端旧数据里把这道错题"复活"
+  item.resolved = true;
+  item.resolvedAt = new Date().toISOString();
+  Store.set(NINI_ERRORS_KEY, errors);
+  renderErrors();
+  renderProgress();
+
+  try {
+    const res = await Cloud.syncToCloud();
+    if (!res || !res.ok) showToast('⚠️ 已记录在本机，云端未连接', 'warn');
+  } catch (_) {
+    showToast('⚠️ 已记录在本机，云端未连接', 'warn');
   }
+  updateCloudBadge();
 };
 
 function famLabel(f) {
@@ -493,40 +619,58 @@ function famLabel(f) {
   return map[f] || '口算题';
 }
 
-// 渲染学情足迹
+// 渲染学情足迹（数据来自云端合并后的档案 + 历史 + 掌握度）
 function renderProgress() {
   const prof = Store.get(PROF_KEY, {});
-  const profile = Store.get(NINI_PROFILE_KEY, { totalSheets: 0, totalQuestions: 0, totalStars: 0 });
-  const history = Store.get(NINI_HISTORY_KEY, []);
+  const profile = Store.get(NINI_PROFILE_KEY, {}) || {};
+  const history = Store.get(NINI_HISTORY_KEY, []) || [];
 
-  // 1. 核心指标卡
-  $('#statSheets').textContent = String(profile.totalSheets || history.length || 0);
-  $('#statQuestions').textContent = String(profile.totalQuestions || (history.length * 48) || 0);
-  $('#statStars').textContent = `${profile.totalStars || 0} ⭐`;
+  // 1. 核心指标卡：优先用档案累计值，缺失时用历史记录推导兜底
+  const histQuestions = history.reduce((a, b) => a + (Number(b.total) || 0), 0);
+  const histCorrect = history.reduce((a, b) => a + (Number(b.correct) || 0), 0);
+  const sheets = Number(profile.totalSheets) || history.length || 0;
+  const questions = Number(profile.totalQuestions) || histQuestions || 0;
 
-  // 计算综合正确率
-  let avgAcc = 100;
-  if (history.length) {
-    const sumAcc = history.reduce((a, b) => a + (b.accuracy || 1), 0);
+  $('#statSheets').textContent = String(sheets);
+  $('#statQuestions').textContent = String(questions);
+
+  // 正确率优先用档案 totalCorrect/totalQuestions，其次历史平均正确率
+  let avgAcc = null;
+  if (profile.totalCorrect != null && questions > 0) {
+    const totalCorrect = Number(profile.totalCorrect);
+    if (isFinite(totalCorrect)) avgAcc = Math.round((totalCorrect / questions) * 100);
+  }
+  if (avgAcc == null && history.length) {
+    const sumAcc = history.reduce((a, b) => a + (Number(b.accuracy) || 0), 0);
     avgAcc = Math.round((sumAcc / history.length) * 100);
   }
+  if (avgAcc == null) avgAcc = 100;
+  avgAcc = Math.max(0, Math.min(100, avgAcc));
   $('#statAccuracy').textContent = `${avgAcc}%`;
+
+  // 星星总量：PC 写 stars，手机旧数据写 totalStars，两者兼容
+  const starTotal = Number(profile.stars != null ? profile.stars : profile.totalStars) || 0;
+  $('#statStars').textContent = `${starTotal} ⭐`;
 
   // 2. 知识点掌握度进度条
   const masteryEl = $('#mobileMasteryList');
   if (masteryEl) {
-    const topics = G.topics.filter(t => prof[t.id]).sort((a, b) => prof[b.id].seen - prof[a.id].seen).slice(0, 8);
+    const topics = G.topics.filter(t => prof[t.id]).sort((a, b) => (Number(prof[b.id].seen) || 0) - (Number(prof[a.id].seen) || 0)).slice(0, 8);
     if (!topics.length) {
       masteryEl.innerHTML = '<p style="color:#64748b;font-size:13px;text-align:center;padding:12px">完成批改后，这里将自动呈现妮妮各知识点的掌握情况。</p>';
     } else {
       masteryEl.innerHTML = topics.map(t => {
-        const m = prof[t.id];
-        const pct = Math.round(m.acc * 100);
+        const m = prof[t.id] || {};
+        const seen = Number(m.seen) || 0;
+        const right = Number(m.right) || 0;
+        // 无 acc 时用 right/seen 兜底；老数据可能只有 seen/right
+        const ratio = (typeof m.acc === 'number' && isFinite(m.acc)) ? m.acc : (seen ? right / seen : 1);
+        const pct = Math.max(0, Math.min(100, Math.round(ratio * 100)));
         return `
           <div class="pbar-wrap">
             <div class="pbar-info">
               <span>${t.name}</span>
-              <span>${pct}% (${m.right}/${m.seen})</span>
+              <span>${pct}% (${right}/${seen})</span>
             </div>
             <div class="pbar-track">
               <div class="pbar-fill" style="width: ${pct}%"></div>
@@ -537,26 +681,46 @@ function renderProgress() {
     }
   }
 
-  // 3. 近期练习记录
+  // 3. 近期练习记录（兼容电脑端 date+timeStr 与旧手机端 ISO date 两种格式）
   const histEl = $('#mobileHistoryList');
   if (histEl) {
     if (!history.length) {
       histEl.innerHTML = '<p style="color:#64748b;font-size:13px;text-align:center;padding:12px">暂无练习打卡记录，快去批改今天的卷子吧！</p>';
     } else {
-      histEl.innerHTML = history.slice(0, 10).map(h => `
+      histEl.innerHTML = history.slice(0, 10).map(h => {
+        const hTotal = Number(h.total) || Number(h.count) || 0;
+        const hRight = Number(h.correct);
+        const hAccuracy = (typeof h.accuracy === 'number' && isFinite(h.accuracy))
+          ? h.accuracy
+          : (hTotal ? hRight / hTotal : 1);
+        const hStars = Number(h.stars) || 1;
+        const hMins = Number(h.durationMinutes) || 6;
+        const color = hAccuracy >= 0.9 ? '#16a34a' : '#dc2626';
+        return `
         <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f1f5f9;font-size:13px">
           <div>
-            <div style="font-weight:700;color:#1e293b">${h.sheetTitle || '口算天天练'} · ${h.total || 48}题</div>
-            <div style="font-size:11px;color:#94a3b8">${formatTime(h.date)} · 用时 ${h.durationMinutes || 6} 分钟</div>
+            <div style="font-weight:700;color:#1e293b">${h.sheetTitle || '口算天天练'} · ${hTotal}题</div>
+            <div style="font-size:11px;color:#94a3b8">${formatRecordWhen(h)} · 用时 ${hMins} 分钟</div>
           </div>
           <div style="text-align:right">
-            <div style="font-weight:800;color:${h.accuracy >= 0.9 ? '#16a34a' : '#dc2626'}">${Math.round((h.accuracy || 1) * 100)}分</div>
-            <div style="font-size:12px">${'⭐'.repeat(h.stars || 1)}</div>
+            <div style="font-weight:800;color:${color}">${Math.round(hAccuracy * 100)}分</div>
+            <div style="font-size:12px">${'⭐'.repeat(Math.max(1, Math.min(3, hStars)))}</div>
           </div>
         </div>
-      `).join('');
+      `;
+      }).join('');
     }
   }
+}
+
+// 兼容两种历史记录时间格式：电脑端 {date:'YYYY-MM-DD', timeStr:'HH:MM'} / 旧手机端 {date: ISO 字符串}
+function formatRecordWhen(h) {
+  if (!h) return '今天';
+  const d = String(h.date || '');
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d);
+  if (m) return `${parseInt(m[2], 10)}月${parseInt(m[3], 10)}日${h.timeStr ? ' ' + h.timeStr : ''}`;
+  if (d) return formatTime(d);
+  return '今天';
 }
 
 // 保底示范试卷（首次进入无云端试卷时使用）

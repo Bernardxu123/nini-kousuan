@@ -1,4 +1,5 @@
 .wrangler/
+.qa/
 node_modules/
 .DS_Store
 *.log
